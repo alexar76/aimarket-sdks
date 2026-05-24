@@ -95,13 +95,21 @@ Map<String, dynamic> sampleCapabilityJson() => {
       'trust_score': 0.95,
     };
 
+// `expires_at` is generated dynamically (24h ahead, ISO8601 with millis to
+// match `DateTime.toIso8601String()` so jsonRoundTrip succeeds, and ahead of
+// `DateTime.now()` so `Channel.isExpired` is false in the cache-reuse test).
+// Previously this was a hardcoded date that became a time-bomb the moment
+// real time crossed it — both round-trip and cache tests started failing.
 Map<String, dynamic> sampleChannelJson() => {
       'channel_id': 'ch_abc123',
       'deposit_usd': 5.0,
       'balance_usd': 4.5,
       'token': 'USDT',
       'chain': 'base',
-      'expires_at': '2026-05-24T12:00:00Z',
+      'expires_at': DateTime.now()
+          .toUtc()
+          .add(const Duration(hours: 24))
+          .toIso8601String(),
     };
 
 ////////////////////////////////////////////////////////////////////////////////
