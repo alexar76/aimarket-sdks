@@ -94,16 +94,33 @@ class TypedData {
 
 // ── DEBIT_TYPEHASH ──────────────────────────────────────────────────────────
 
-/// The EIP-712 typehash for DebitAuthorization matching the on-chain contract.
+/// The EIP-712 typehash string for DebitAuthorization.
+///
+/// This string MUST match the on-chain contract byte-for-byte. The contract
+/// computes `keccak256(bytes(debitTypehashHeader))` and any drift between the
+/// two strings produces a different digest, so `ECDSA.recover` returns the
+/// wrong signer and the transaction reverts with `InvalidSignature()`.
 ///
 /// ```solidity
-/// bytes32 constant DEBIT_TYPEHASH = keccak256(
-///   "DebitAuthorization(address sender,uint256 amount,uint256 nonce,uint256 deadline)"
+/// // contracts/evm/AIMarketEscrow.sol
+/// bytes32 private constant DEBIT_TYPEHASH = keccak256(
+///   "DebitAuthorization(bytes32 channelId,address hub,address token,uint256 amount,bytes32 receiptId,uint256 nonce,uint256 deadline)"
 /// );
 /// ```
-/// Used by the payment channel contract to verify signed debit authorizations.
+///
+/// `hub` is part of the signed payload so a depositor's signature is bound to
+/// exactly one hub — preventing any other authorized hub from front-running
+/// the first debit and capturing the channel.
 const String debitTypehashHeader =
-    'DebitAuthorization(address sender,uint256 amount,uint256 nonce,uint256 deadline)';
+    'DebitAuthorization(bytes32 channelId,address hub,address token,uint256 amount,bytes32 receiptId,uint256 nonce,uint256 deadline)';
+
+/// Contract name used in the EIP-712 domain separator. Matches
+/// `keccak256(bytes("AIMarketEscrow"))` in `AIMarketEscrow.sol`.
+const String escrowContractName = 'AIMarketEscrow';
+
+/// Contract version used in the EIP-712 domain separator. Matches
+/// `keccak256(bytes("1"))` in `AIMarketEscrow.sol`.
+const String escrowContractVersion = '1';
 
 // ── Signer ─────────────────────────────────────────────────────────────────
 
@@ -123,17 +140,13 @@ const String debitTypehashHeader =
 class MarketSigner {
   final String _privateKeyHex;
 
-  /// Verify the key is valid hex on construction.
+  /// Construct a signer.
+  ///
+  /// Production keys are 64-char hex (32-byte Ed25519 seed). Dev/test stubs
+  /// often pass any opaque string — both are accepted; the HMAC-style
+  /// [signCanonical] stub simply feeds the raw UTF-8 bytes into the digest.
   MarketSigner({required String privateKeyHex})
-      : _privateKeyHex = privateKeyHex {
-    // Validate hex encoding — throws FormatException if invalid.
-    if (privateKeyHex.isNotEmpty) {
-      final cleaned = privateKeyHex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
-      if (cleaned.length != privateKeyHex.length) {
-        throw ArgumentError('privateKeyHex must be hex-encoded');
-      }
-    }
-  }
+      : _privateKeyHex = privateKeyHex;
 
   /// Sign a canonical string, returning "ed25519:<base64sig>".
   ///
@@ -212,37 +225,64 @@ class MarketSigner {
     return 'eip712:${data.encoded}';
   }
 
-  /// Sign a debit authorization for EVM contract compatibility.
+  /// Sign a debit authorization for the on-chain `AIMarketEscrow` contract.
   ///
-  /// Constructs an EIP-712 typed data payload and signs it, matching the
-  /// on-chain settlement contract's DEBIT_TYPEHASH.
+  /// Builds the exact EIP-712 typed-data envelope expected by the deployed
+  /// escrow contract (see [debitTypehashHeader]) and signs it. The depositor
+  /// authorizes ONE hub to debit ONE channel for ONE amount, paired with ONE
+  /// receipt; the nonce + deadline give replay protection.
   ///
-  /// Parameters:
-  /// - [sender]: Ethereum address (0x-prefixed) authorizing the debit.
-  /// - [amount]: USD amount being authorized for deduction.
-  /// - [nonce]: Channel nonce for replay protection.
-  /// - [deadline]: Unix timestamp after which the authorization expires.
+  /// Parameters
+  /// - [channelId]: 0x-prefixed 32-byte channel identifier (bytes32 on-chain).
+  /// - [hub]: 0x-prefixed Ethereum address of the hub allowed to call
+  ///   `debitChannel`. Bound on first debit; subsequent debits must come from
+  ///   the same hub.
+  /// - [token]: 0x-prefixed ERC-20 token address (USDT/USDC) escrowed in the
+  ///   channel.
+  /// - [amount]: Token amount in **base units** (e.g. 6-decimal USDT/USDC —
+  ///   `1.5 USDT` = `1500000`). Doubles are NOT acceptable on-chain.
+  /// - [receiptId]: 0x-prefixed 32-byte receipt identifier; the contract
+  ///   stores this in `usedReceipts[receiptId]` to prevent double-spend.
+  /// - [nonce]: Current channel nonce (read from the channel before signing;
+  ///   the contract increments after a successful debit).
+  /// - [deadline]: Unix timestamp after which the contract rejects the
+  ///   authorization with `ChannelExpired()`.
+  /// - [chainId]: EVM chain ID hosting the escrow (e.g. 8453 = Base mainnet).
+  /// - [verifyingContract]: 0x-prefixed deployed escrow address.
   ///
-  /// Returns an "eip712:<hex>" signature string.
+  /// Returns an `"eip712:<hex>"` signature string. Production builds MUST
+  /// replace the SHA-256 stub used by [TypedData] / [signEip712TypedData]
+  /// with `keccak256` + `secp256k1` ECDSA — otherwise `ecrecover` on-chain
+  /// returns a different address and the call reverts with
+  /// `InvalidSignature()`. The encoded payload is correct; only the digest
+  /// hash function and the signing algorithm need to be swapped.
   String signDebitAuthorization({
-    required String sender,
-    required double amount,
-    required int nonce,
+    required String channelId,
+    required String hub,
+    required String token,
+    required BigInt amount,
+    required String receiptId,
+    required BigInt nonce,
     required int deadline,
+    int chainId = 8453,
+    String verifyingContract = '0x0000000000000000000000000000000000000000',
   }) {
     final domain = Eip712Domain(
-      name: 'AI Market',
-      version: '2',
-      chainId: 8453,
-      verifyingContract: '0x0000000000000000000000000000000000000000',
+      name: escrowContractName,
+      version: escrowContractVersion,
+      chainId: chainId,
+      verifyingContract: verifyingContract,
     );
 
     final data = TypedData(
       domain: domain,
       primaryType: 'DebitAuthorization',
       message: {
-        'sender': sender,
+        'channelId': channelId,
+        'hub': hub,
+        'token': token,
         'amount': amount.toString(),
+        'receiptId': receiptId,
         'nonce': nonce.toString(),
         'deadline': deadline.toString(),
       },

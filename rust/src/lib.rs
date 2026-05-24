@@ -30,3 +30,7 @@ pub mod tee;
 
 pub use agent::AimarketAgent;
 pub use models::*;
+pub use signer::{
+    encode_debit_authorization, DebitAuthorization, MarketSigner, DEBIT_TYPEHASH_HEADER,
+    ESCROW_CONTRACT_NAME, ESCROW_CONTRACT_VERSION,
+};

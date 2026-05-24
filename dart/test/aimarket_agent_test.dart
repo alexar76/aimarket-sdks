@@ -510,25 +510,86 @@ void main() {
       );
       expect(headers, containsPair('X-Payment-Channel', 'ch_1'));
       expect(headers, containsPair('X-AIMarket-Affiliate', 'test-agent'));
-      expect(headers, containsKey('X-Market-Signature'));
+      expect(headers.containsKey('X-Market-Signature'), true);
     });
 
     test('signDebitAuthorization produces deterministic eip712 signature', () {
-      final signer = MarketSigner(privateKeyHex: 'test-key');
+      final signer = MarketSigner(
+        privateKeyHex:
+            '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
+      );
+      final args = {
+        'channelId':
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        'hub': '0x000000000000000000000000000000000000bEEF',
+        'token': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        'amount': BigInt.from(5000000), // 5.00 USDT (6 decimals)
+        'receiptId':
+            '0x0000000000000000000000000000000000000000000000000000000000001234',
+        'nonce': BigInt.zero,
+        'deadline': 2000000000,
+      };
       final sig1 = signer.signDebitAuthorization(
-        sender: '0x1234',
-        amount: 5.0,
-        nonce: 1,
-        deadline: 2000000000,
+        channelId: args['channelId'] as String,
+        hub: args['hub'] as String,
+        token: args['token'] as String,
+        amount: args['amount'] as BigInt,
+        receiptId: args['receiptId'] as String,
+        nonce: args['nonce'] as BigInt,
+        deadline: args['deadline'] as int,
       );
       final sig2 = signer.signDebitAuthorization(
-        sender: '0x1234',
-        amount: 5.0,
-        nonce: 1,
-        deadline: 2000000000,
+        channelId: args['channelId'] as String,
+        hub: args['hub'] as String,
+        token: args['token'] as String,
+        amount: args['amount'] as BigInt,
+        receiptId: args['receiptId'] as String,
+        nonce: args['nonce'] as BigInt,
+        deadline: args['deadline'] as int,
       );
       expect(sig1, sig2);
       expect(sig1, startsWith('eip712:'));
+    });
+
+    test('signDebitAuthorization is bound to the hub', () {
+      // The on-chain contract requires `hub` in the signed payload so a
+      // signature for hub A cannot be replayed by hub B. The SDK must produce
+      // a different signature when only the hub changes.
+      final signer = MarketSigner(
+        privateKeyHex:
+            '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
+      );
+      final base = signer.signDebitAuthorization(
+        channelId:
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        hub: '0x000000000000000000000000000000000000AAAA',
+        token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        amount: BigInt.from(5000000),
+        receiptId:
+            '0x0000000000000000000000000000000000000000000000000000000000001234',
+        nonce: BigInt.zero,
+        deadline: 2000000000,
+      );
+      final swappedHub = signer.signDebitAuthorization(
+        channelId:
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        hub: '0x000000000000000000000000000000000000BBBB',
+        token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        amount: BigInt.from(5000000),
+        receiptId:
+            '0x0000000000000000000000000000000000000000000000000000000000001234',
+        nonce: BigInt.zero,
+        deadline: 2000000000,
+      );
+      expect(base, isNot(swappedHub));
+    });
+
+    test('debitTypehashHeader matches the on-chain contract literal', () {
+      // contracts/evm/AIMarketEscrow.sol DEBIT_TYPEHASH
+      expect(
+        debitTypehashHeader,
+        'DebitAuthorization(bytes32 channelId,address hub,address token,uint256 amount,bytes32 receiptId,uint256 nonce,uint256 deadline)',
+      );
     });
 
     test('verifyHubSignature verifies ed25519', () {

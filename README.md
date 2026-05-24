@@ -1,3 +1,10 @@
+<!-- aicom-mirror-notice -->
+> **Mirror — read-only.**
+> The canonical source for `aimarket-sdks` lives in the AI-Factory monorepo.
+> Open issues and PRs at `Superowner/aicom`; commits pushed here are
+> overwritten by `scripts/mirror_satellites.sh` on the next sync run.
+> See `docs/repository-canonical-policy.md` for the policy.
+
 # aimarket-sdks
 
 Language-native SDKs for the [AI Market Protocol v2](https://github.com/alexar76/aimarket-protocol).  
