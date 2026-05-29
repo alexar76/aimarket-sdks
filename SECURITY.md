@@ -10,8 +10,7 @@ We acknowledge within 48 hours and share a fix timeline.
 
 ## Scope
 
-- `aimarket-sdks` consumer SDKs (Dart, TypeScript, Rust)
-- Wallet key handling, hub HTTP client, TEE verification helpers
+- `aimarket-sdks`
 
 ## Out of Scope
 
@@ -29,3 +28,4 @@ We acknowledge within 48 hours and share a fix timeline.
 ## Disclosure
 
 Coordinated disclosure preferred. We credit researchers in release notes when permitted.
+

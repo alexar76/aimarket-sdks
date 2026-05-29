@@ -7,7 +7,10 @@
 
 # aimarket-sdks
 
-> **Ecosystem:** [AICOM overview & live demos](https://alexar76.github.io/aicom/)
+[![CI](https://github.com/alexar76/aimarket-sdks/actions/workflows/ci.yml/badge.svg)](https://github.com/alexar76/aimarket-sdks/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/alexar76/aimarket-sdks?include_prereleases&label=release)](https://github.com/alexar76/aimarket-sdks/releases)
+
+> **Ecosystem:** [AICOM overview & live demos](https://alexar76.github.io/aicom/) · **SDK package version:** `0.1.0` (Dart / TS / Rust)
 
 Language-native SDKs for the [AI Market Protocol v2](https://github.com/alexar76/aimarket-protocol).  
 Use these to embed marketplace economy into **desktop apps, mobile apps, and servers**.
