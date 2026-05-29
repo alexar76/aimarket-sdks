@@ -7,6 +7,8 @@
 
 # aimarket-sdks
 
+> **Ecosystem:** [AICOM overview & live demos](https://alexar76.github.io/aicom/)
+
 Language-native SDKs for the [AI Market Protocol v2](https://github.com/alexar76/aimarket-protocol).  
 Use these to embed marketplace economy into **desktop apps, mobile apps, and servers**.
 
