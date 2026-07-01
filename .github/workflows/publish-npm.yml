@@ -1,0 +1,38 @@
+name: Publish npm (TypeScript only)
+
+# Publishes @aimarket/agent to npmjs.com without bumping Dart/Rust crates.
+# Use when TypeScript SDK version leads (e.g. 0.1.1) while other langs stay on 0.1.0.
+#
+# Manual: Actions → Publish npm (TypeScript only) → Run workflow
+# Or:     NPM_TOKEN=… ./scripts/publish_npm.sh aimarket-sdks/typescript
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
