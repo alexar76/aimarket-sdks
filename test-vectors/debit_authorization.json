@@ -1,0 +1,19 @@
+{
+  "description": "Cross-SDK EIP-712 debit authorization test vector (AIMarketEscrow.sol)",
+  "params": {
+    "channelId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "hub": "0x000000000000000000000000000000000000bEEF",
+    "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "5000000",
+    "receiptId": "0x0000000000000000000000000000000000000000000000000000000000001234",
+    "nonce": "0",
+    "deadline": 2000000000,
+    "chainId": 31337,
+    "verifyingContract": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "ed25519SeedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "ethereumPrivateKeyHex": "ac0974bec39a17e36ba4b6b40d764b994fa08d04ce65968ec04ec80ecb000000",
+  "canonicalMessage": "hello hub",
+  "expectedDigest": "0x3f1004cedd565143d1a0fbe67f56de61d44de52ec49390d33a3784b1a2f95c69",
+  "notes": "Run: cd typescript && npm run build && npx vitest run test/cross_sdk_vectors.test.ts"
+}
