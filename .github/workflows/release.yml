@@ -1,0 +1,142 @@
+name: Release
+
+# Publishes all three SDKs to their registries via **Trusted Publishing (OIDC)** —
+# no long-lived registry tokens are stored. Each language is an independent job, so a
+# failure in one (e.g. a registry outage) does not block the others — re-run in isolation.
+#
+# Required one-time setup (in each registry, pointing at the published satellite
+# alexar76/aimarket-sdks — NOT the monorepo). Each package must have been published
+# once manually before its trusted publisher can be configured:
+#   • npm     → npmjs.com → @aimarket/agent → Settings → "Trusted Publisher":
+#       organization alexar76, repository aimarket-sdks, workflow filename release.yml
+#   • crates  → crates.io → aimarket-agent → Settings → "Trusted Publishing":
+#       repository alexar76/aimarket-sdks, workflow release.yml
+#   • pub.dev → package aimarket_agent → Admin → "Automated publishing":
+#       enable GitHub Actions, repository alexar76/aimarket-sdks, tag pattern v{{version}}
+# All three use GitHub OIDC — no secrets stored.
+#
+# Tag convention: v0.1.0 (must match the version in each package manifest;
+# the monorepo's ecosystem-parity guard keeps those three versions in lock-step).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # A job that can mint an OIDC token runs no dependency code: anything `npm ci` or a
+  # crate's build script runs could ask for a token for any audience. Each language
+  # builds and tests in a job without one; the publish job only uploads the result.
+  npm_build:
+    name: Build + test TypeScript (@aimarket/agent)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm pack
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: npm-tarball
+          path: typescript/*.tgz
+          if-no-files-found: error
+
+  npm:
+    name: Publish TypeScript → npm (@aimarket/agent)
+    needs: npm_build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing
+    steps:
+      # Node 24 ships an npm with trusted publishing (>= 11.5.1), so nothing is
+      # installed from the registry in this job.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: npm-tarball
+          path: dist-npm
+      - name: npm has trusted publishing
+        run: |
+          v=$(npm --version)
+          printf '%s\n11.5.1\n' "$v" | sort -V -C || { echo "::error::npm $v < 11.5.1"; exit 1; }
+      # No NODE_AUTH_TOKEN: npm detects the OIDC token and publishes with provenance.
+      # The tarball was built and tested above; publishing it runs none of its scripts.
+      - run: npm publish dist-npm/*.tgz --access public --ignore-scripts
+
+  crates_verify:
+    name: Verify Rust package (aimarket-agent)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d  # stable 2026-10-01
+      # The full verify build (dependency build scripts included) runs here, without OIDC.
+      - run: cargo publish --dry-run
+
+  crates:
+    name: Publish Rust → crates.io (aimarket-agent)
+    needs: crates_verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # OIDC token exchanged by crates-io-auth-action
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d  # stable 2026-10-01
+      # Exchanges the GitHub OIDC token for a short-lived crates.io token.
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18  # v1.0.5
+        id: auth
+      # Verified by crates_verify on the same commit: package and upload, build nothing.
+      - run: cargo publish --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  pub_dev:
+    name: Publish Dart → pub.dev (aimarket_agent)
+    runs-on: ubuntu-latest
+    environment: release
+    # id-token: write lets `dart pub publish` exchange a GitHub OIDC token for a
+    # short-lived pub.dev credential — requires "Automated publishing" enabled on
+    # pub.dev for this repo + tag pattern (see header). No stored secret. `pub get`
+    # runs no package code, so this job stays free of third-party code.
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: dart
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c  # v1.7.0
+      - run: dart pub get
+      - run: dart pub publish --force
