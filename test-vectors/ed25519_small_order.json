@@ -1,0 +1,38 @@
+{
+  "description": "Ed25519 strict verification (2026-10-12). Under a small-order public key, OpenSSL, tweetnacl, WebCrypto and permissive ed25519-dalek accept a signature that is valid for EVERY message, and no secret key exists for it. Every SDK's verify MUST return false for each forgery and true for the RFC 8032 vector. The forgery is the counter-example of AWR/2 SPEC section 6.3.1.",
+  "rfc8032Test1": {
+    "publicKeyHex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "message": "",
+    "signatureHex": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+  },
+  "forgeries": [
+    {
+      "name": "identity key, R = base point, S = 1",
+      "publicKeyHex": "0100000000000000000000000000000000000000000000000000000000000000",
+      "signatureHex": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+      "messages": [
+        "",
+        "pay 100 USDC to mallory",
+        "any other message"
+      ]
+    },
+    {
+      "name": "honest-looking R with an order-2 key",
+      "publicKeyHex": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+      "signatureHex": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+      "messages": [
+        "receipt"
+      ]
+    }
+  ],
+  "smallOrderPointsHex": [
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "0000000000000000000000000000000000000000000000000000000000000080",
+    "0100000000000000000000000000000000000000000000000000000000000000",
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
+  ]
+}

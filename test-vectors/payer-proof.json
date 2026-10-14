@@ -1,0 +1,86 @@
+{
+  "$comment": "Canonical channel-open payer proof. The PAYING wallet signs `message` with EIP-191 personal_sign to claim a deposit; the hub recovers the signer and refuses to credit unless it matches the on-chain payer. Every SDK MUST reproduce `message` byte for byte.",
+  "domain": "AIMarket-Payer-Proof",
+  "version": 1,
+  "purpose": "channel-open",
+  "canonicalisation": {
+    "chain": "trimmed, lowercased",
+    "tx_hash": "if the body is hex: '0x' + lowercase(body) \u2014 the 0x prefix is normalised IN, not just the case. Non-hex (base58) is left byte-exact.",
+    "payer": "a 42-char 0x hex address is lowercased (EIP-55 case is a checksum, not identity); other handles keep their case",
+    "amount_cents": "int(round(amount_usd * 100)) with Python's ROUND-HALF-TO-EVEN. 0.125 -> 12, not 13. JS/Dart/Rust round half away from zero and MUST implement banker's rounding to match."
+  },
+  "signing": "EIP-191: keccak256('\\x19Ethereum Signed Message:\\n' + len(message) + message)",
+  "test_key": "0x4242424242424242424242424242424242424242424242424242424242424242",
+  "test_address": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025",
+  "cases": [
+    {
+      "name": "plain",
+      "chain": "base",
+      "tx_hash": "0xdededededededededededededededededededededededededededededededede",
+      "payer": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025",
+      "amount_usd": 5.0,
+      "amount_cents": 500,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0xdededededededededededededededededededededededededededededededede\npayer:0x17c5185167401ed00cf5f5b2fc97d9bbfdb7d025\namount_cents:500",
+      "signature": "0x5712de73f57ddc29c29c22e50d8a67370d1b201d4bbb1d610d2d4c75907c4f222ad3959d5fd4e6ae730cc7be6afdd6ebc6c0562118bde7b761f34ff17ffccb2c1b",
+      "recovers_to": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025"
+    },
+    {
+      "name": "tx_case_and_0x",
+      "chain": "Base",
+      "tx_hash": "0xDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDE",
+      "payer": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025",
+      "amount_usd": 5.0,
+      "amount_cents": 500,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0xdededededededededededededededededededededededededededededededede\npayer:0x17c5185167401ed00cf5f5b2fc97d9bbfdb7d025\namount_cents:500",
+      "signature": "0x5712de73f57ddc29c29c22e50d8a67370d1b201d4bbb1d610d2d4c75907c4f222ad3959d5fd4e6ae730cc7be6afdd6ebc6c0562118bde7b761f34ff17ffccb2c1b",
+      "recovers_to": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025"
+    },
+    {
+      "name": "tx_without_0x",
+      "chain": "base",
+      "tx_hash": "dededededededededededededededededededededededededededededededede",
+      "payer": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025",
+      "amount_usd": 5.0,
+      "amount_cents": 500,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0xdededededededededededededededededededededededededededededededede\npayer:0x17c5185167401ed00cf5f5b2fc97d9bbfdb7d025\namount_cents:500",
+      "signature": "0x5712de73f57ddc29c29c22e50d8a67370d1b201d4bbb1d610d2d4c75907c4f222ad3959d5fd4e6ae730cc7be6afdd6ebc6c0562118bde7b761f34ff17ffccb2c1b",
+      "recovers_to": "0x17c5185167401eD00cF5F5b2fc97D9BBfDb7D025"
+    },
+    {
+      "name": "payer_mixed_case",
+      "chain": "base",
+      "tx_hash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "payer": "0xAbAbAbAbAbAbAbAbAbAbAbAbAbAbAbAbAbAbAbAb",
+      "amount_usd": 0.35,
+      "amount_cents": 35,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0x1111111111111111111111111111111111111111111111111111111111111111\npayer:0xabababababababababababababababababababab\namount_cents:35"
+    },
+    {
+      "name": "solana_base58_case_significant",
+      "chain": "solana",
+      "tx_hash": "3Bxs4h24hBjHziLAa2",
+      "payer": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "amount_usd": 1.0,
+      "amount_cents": 100,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:solana\ntx:3Bxs4h24hBjHziLAa2\npayer:0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\namount_cents:100"
+    },
+    {
+      "name": "half_cent_rounds_to_even",
+      "chain": "base",
+      "tx_hash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+      "payer": "0x2222222222222222222222222222222222222222",
+      "amount_usd": 0.125,
+      "amount_cents": 12,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0x2222222222222222222222222222222222222222222222222222222222222222\npayer:0x2222222222222222222222222222222222222222\namount_cents:12"
+    },
+    {
+      "name": "float_noise_rounds_up",
+      "chain": "base",
+      "tx_hash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+      "payer": "0x2222222222222222222222222222222222222222",
+      "amount_usd": 0.135,
+      "amount_cents": 14,
+      "message": "AIMarket-Payer-Proof/v1\npurpose:channel-open\nchain:base\ntx:0x3333333333333333333333333333333333333333333333333333333333333333\npayer:0x2222222222222222222222222222222222222222\namount_cents:14"
+    }
+  ]
+}
