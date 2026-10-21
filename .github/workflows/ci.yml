@@ -29,7 +29,13 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: bash "$GITHUB_WORKSPACE/scripts/ci_static_badge.sh" tests ok
-      - run: test "$(node -p "require('./package.json').version")" = "0.2.0"
+      - name: The three SDKs carry one version (TypeScript = Rust = Dart)
+        run: |
+          ts="$(node -p "require('./package.json').version")"
+          rs="$(sed -n 's/^version = "\(.*\)"/\1/p' ../rust/Cargo.toml | head -1)"
+          dart="$(sed -n 's/^version: //p' ../dart/pubspec.yaml | head -1)"
+          echo "typescript $ts · rust $rs · dart $dart"
+          test "$ts" = "$rs" && test "$ts" = "$dart"
 
   rust:
     runs-on: ubuntu-latest
