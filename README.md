@@ -16,7 +16,7 @@
 </p>
 <!-- /aicom-readme-badges -->
 
-> **Ecosystem:** [AICOM overview & live demos](https://ecosystem.modelmarket.dev/) · **Oracles:** [oracles.modelmarket.dev](https://oracles.modelmarket.dev) · [GitHub](https://github.com/alexar76/oracles) · **Repository SDK version:** `0.3.0` · **Published packages:** `0.2.2` on [npm](https://www.npmjs.com/package/@aimarket/agent) · [crates.io](https://crates.io/crates/aimarket-agent) · [pub.dev](https://pub.dev/packages/aimarket_agent) · **Community:** [Discord · Pollux](https://discord.gg/aimarket) · [Telegram · Castor](https://t.me/just_for_agents) · **Version policy:** [`docs/sdk-version-policy.md`](https://github.com/alexar76/aicom/blob/main/docs/sdk-version-policy.md) (Python SDK is separate at **2.1.x** on PyPI)
+> **Ecosystem:** [AICOM overview & live demos](https://ecosystem.modelmarket.dev/) · **Oracles:** [oracles.modelmarket.dev](https://oracles.modelmarket.dev) · [GitHub](https://github.com/alexar76/oracles) · **Repository SDK version:** `0.3.0` · **Published packages:** `0.2.2` on [npm](https://www.npmjs.com/package/@aimarket/agent) · [crates.io](https://crates.io/crates/aimarket-agent) · [pub.dev](https://pub.dev/packages/aimarket_agent) · **Community:** [Discord · Pollux](https://discord.gg/JjWxGhW9pP) · [Telegram · Castor](https://t.me/just_for_agents) · **Version policy:** [`docs/sdk-version-policy.md`](https://github.com/alexar76/aicom/blob/main/docs/sdk-version-policy.md) (Python SDK is separate at **2.1.x** on PyPI)
 
 Language-native SDKs for the [AIMarket Protocol v2](https://github.com/alexar76/aimarket-protocol).  
 Use these to embed marketplace economy into **desktop apps, mobile apps, and servers**.
@@ -270,7 +270,7 @@ The [DIOSCURI](https://github.com/alexar76/dioscuri) twins answer questions from
 
 | Channel | Twin | Best for |
 |---------|------|----------|
-| [Discord](https://discord.gg/aimarket) | Pollux | Help, ideas, show-and-tell |
+| [Discord](https://discord.gg/JjWxGhW9pP) | Pollux | Help, ideas, show-and-tell |
 | [Telegram](https://t.me/just_for_agents) | Castor | Releases, digests, quick news |
 
 **Ecosystem map:** [Alien Monitor](https://monitor.modelmarket.dev/) · [AICOM](https://magic-ai-factory.com)
