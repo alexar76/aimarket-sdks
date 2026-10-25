@@ -44,6 +44,7 @@ export interface AimarketAgentConfig {
   walletKey: string;
   affiliate: string;
   timeoutMs: number;
+  /** Retained for configuration compatibility; paid invokes are always single-shot. */
   maxRetries: number;
   trustedCodeHashes?: Record<string, string>;
   verifyTee: boolean;
@@ -169,35 +170,19 @@ export class AimarketAgent {
     this.fetchFn = opts.fetch ?? fetch;
   }
 
-  private async retryWithBackoff<T>(operation: () => Promise<T>): Promise<T> {
-    let lastError = new AimarketNetworkException(
-      `Request failed after ${this.config.maxRetries} retries`
-    );
-
-    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (e) {
-        if (e instanceof AimarketNetworkException) {
-          lastError = e;
-        } else if (e instanceof Error && e.name === 'AbortError') {
-          lastError = new AimarketNetworkException(`Request timed out: ${e.message}`);
-        } else if (
-          e instanceof TypeError ||
-          (e instanceof Error && e.message.includes('fetch'))
-        ) {
-          lastError = new AimarketNetworkException(`Network error: ${e.message}`);
-        } else {
-          throw e;
-        }
+  private async requestOnce<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (e) {
+      if (e instanceof AimarketNetworkException) throw e;
+      if (e instanceof Error && e.name === 'AbortError') {
+        throw new AimarketNetworkException(`Request timed out: ${e.message}`);
       }
-
-      if (attempt < this.config.maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+      if (e instanceof TypeError || (e instanceof Error && e.message.includes('fetch'))) {
+        throw new AimarketNetworkException(`Network error: ${e.message}`);
       }
+      throw e;
     }
-
-    throw lastError;
   }
 
   private async fetchWithTimeout(
@@ -208,7 +193,7 @@ export class AimarketAgent {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs ?? this.config.timeoutMs);
     try {
-      return await this.fetchFn(input, { ...init, signal: controller.signal });
+      return await this.fetchFn(input, { ...init, redirect: 'error', signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
@@ -389,14 +374,9 @@ export class AimarketAgent {
         'invoke needs a way to pay: pass channelId (from openChannel) or create the agent with an apiKey'
       );
     }
-    // A verified invoke with wait=true blocks server-side until Metis returns a
-    // verdict while the hub holds the debit in escrow. Retrying it on a transient
-    // error would re-POST a fresh nonce mid-wait and open a SECOND hold — the
-    // buyer pays twice. Fire it exactly once (no retry wrapper) in that case.
-    if (opts.verify?.wait) {
-      return this.invokeOnce(opts);
-    }
-    return this.retryWithBackoff(() => this.invokeOnce(opts));
+    // A lost response cannot tell us whether this POST was charged. The
+    // protocol does not require idempotency support, so never replay it.
+    return this.requestOnce(() => this.invokeOnce(opts));
   }
 
   /** Payment headers: the credit account when there is a key, the channel otherwise. */

@@ -17,6 +17,7 @@ class _MockHttpClient extends http.BaseClient {
   final Map<String, http.Response> _responses = {};
   int requestCount = 0;
   final List<String> requestLog = [];
+  final List<bool> followRedirectsLog = [];
 
   /// Raw request bodies, in call order ('' for body-less requests).
   final List<String> bodyLog = [];
@@ -52,6 +53,7 @@ class _MockHttpClient extends http.BaseClient {
     requestCount++;
     final key = '${request.method} ${request.url}';
     requestLog.add(key);
+    followRedirectsLog.add(request.followRedirects);
     bodyLog.add(request is http.Request ? request.body : '');
     headerLog.add({
       for (final h in request.headers.entries) h.key.toLowerCase(): h.value,
@@ -565,6 +567,15 @@ void main() {
   group('MarketSigner', () {
     const ed25519Seed =
         '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';
+
+    test('never hashes a malformed seed into a signing identity', () {
+      for (final invalid in ['', 'your-wallet-private-key-hex', 'abc', '0x12', 'not-a-secret']) {
+        expect(() => MarketSigner(privateKeyHex: invalid), throwsArgumentError);
+      }
+      final expected = MarketSigner(privateKeyHex: ed25519Seed).publicKeyBase64();
+      expect(MarketSigner(privateKeyHex: '0x$ed25519Seed').publicKeyBase64(), expected);
+      expect(MarketSigner(privateKeyHex: '0X$ed25519Seed').publicKeyBase64(), expected);
+    });
     const ethPrivateKey =
         'ac0974bec39a17e36ba4b6b40d764b994fa08d04ce65968ec04ec80ecb000000';
 
@@ -589,12 +600,12 @@ void main() {
     });
 
     test('verify returns false for non-ed25519 signature', () {
-      final signer = MarketSigner(privateKeyHex: 'key');
+      final signer = MarketSigner(privateKeyHex: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60');
       expect(signer.verify('any', 'hmac:abc', 'msg'), false);
     });
 
     test('signedHeaders includes all required headers', () {
-      final signer = MarketSigner(privateKeyHex: 'key');
+      final signer = MarketSigner(privateKeyHex: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60');
       final headers = signer.signedHeaders(
         channelId: 'ch_1',
         capabilityId: 'cap_1',
@@ -771,7 +782,7 @@ void main() {
 
     setUp(() {
       verifier = TeeVerifier(
-        signer: MarketSigner(privateKeyHex: 'test-key'),
+        signer: MarketSigner(privateKeyHex: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60'),
         trustedCodeHashes: {'cap_1': 'sha256:good'},
       );
 
@@ -922,7 +933,7 @@ void main() {
     test('constructor accepts required params', () {
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key-hex',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
       expect(agent, isNotNull);
@@ -932,7 +943,7 @@ void main() {
     test('discover returns parsed plan steps', () async {
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
       // Without a matching mock, discover throws AimarketException.
@@ -955,7 +966,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -976,7 +987,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1009,7 +1020,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1033,7 +1044,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1058,7 +1069,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1088,7 +1099,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1120,7 +1131,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1145,7 +1156,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1168,7 +1179,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1183,7 +1194,7 @@ void main() {
       agent.dispose();
     });
 
-    test('retry logic succeeds after transient failure', () async {
+    test('does not replay a possibly charged invoke after a lost response', () async {
       mockClient.expectPost(
         'https://modelmarket.dev/ai-market/v2/invoke',
         200,
@@ -1198,19 +1209,16 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
         maxRetries: 3,
       );
 
-      final result = await agent.invoke(
-        capabilityId: 'cap_1',
-        input: {},
-        channelId: 'ch_1',
-      );
-      expect(result.success, true);
-      // Should have tried: fail, fail, succeed = 3 requests
-      expect(mockClient.requestCount, greaterThanOrEqualTo(3));
+      await expectLater(agent.invoke(
+        capabilityId: 'cap_1', input: {}, channelId: 'ch_1',
+      ), throwsA(isA<AimarketNetworkException>()));
+      expect(mockClient.requestCount, 1);
+      expect(mockClient.followRedirectsLog, [false]);
       agent.dispose();
     });
 
@@ -1225,14 +1233,12 @@ void main() {
           'latency_ms': 100,
         }),
       );
-      // First POST fails transiently. A non-verified invoke would retry and
-      // succeed; a wait=true invoke must be single-shot so a mid-wait re-POST
-      // can't mint a fresh nonce and open a second hold/debit.
+      // A lost response must never mint a second hold/debit.
       mockClient.failNextPost(1);
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
         maxRetries: 3,
       );
@@ -1265,7 +1271,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1288,7 +1294,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1305,7 +1311,7 @@ void main() {
     test('invokeBatch throws ArgumentError on length mismatch', () {
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1334,7 +1340,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1354,7 +1360,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1374,7 +1380,7 @@ void main() {
 
       final agent = AimarketAgent(
         hubUrl: 'https://modelmarket.dev',
-        walletKey: 'test-key',
+        walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
         httpClient: mockClient,
       );
 
@@ -1431,7 +1437,7 @@ void main() {
 
     AimarketAgent agentFor({String? apiKey}) => AimarketAgent(
           hubUrl: hub,
-          walletKey: 'test-key',
+          walletKey: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
           httpClient: mockClient,
           apiKey: apiKey,
         );

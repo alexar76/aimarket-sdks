@@ -11,6 +11,15 @@ import {
 const ED25519_SEED =
   '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';
 
+it('never hashes a malformed seed or placeholder into a signing identity', () => {
+  for (const invalid of ['', 'your-wallet-private-key-hex', 'abc', '0x12', 'not-a-secret']) {
+    expect(() => new MarketSigner(invalid)).toThrow('32-byte hex');
+  }
+  const expected = new MarketSigner(ED25519_SEED).publicKeyBase64();
+  expect(new MarketSigner(`0x${ED25519_SEED}`).publicKeyBase64()).toBe(expected);
+  expect(new MarketSigner(`0X${ED25519_SEED}`).publicKeyBase64()).toBe(expected);
+});
+
 // Anvil account #0 — standard test Ethereum key.
 const ETH_PRIVATE_KEY =
   '0xac0974bec39a17e36ba4b6b40d764b994fa08d04ce65968ec04ec80ecb000000';

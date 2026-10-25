@@ -223,13 +223,13 @@ class MarketSigner {
       generateEthereumWallet();
 
   static Uint8List _parseSeedBytes(String hexOrDev) {
-    final normalized = hexOrDev.startsWith('0x') ? hexOrDev.substring(2) : hexOrDev;
+    final normalized = hexOrDev.replaceFirst(RegExp(r'^0[xX]'), '');
     if (normalized.length == 64 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(normalized)) {
       return Uint8List.fromList(List<int>.generate(32, (i) {
         return int.parse(normalized.substring(i * 2, i * 2 + 2), radix: 16);
       }));
     }
-    return Uint8List.fromList(sha256.convert(utf8.encode(hexOrDev)).bytes);
+    throw ArgumentError('privateKeyHex must be a 32-byte hex string (64 chars)');
   }
 
   static Uint8List _decodePublicKey(String publicKey) {

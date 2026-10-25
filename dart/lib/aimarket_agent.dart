@@ -77,7 +77,7 @@
 /// - [BillOfMaterials] — full interaction trace
 ///
 /// ### Signing & Crypto
-/// - [MarketSigner] — Ed25519 signing (HMAC-SHA256 stub)
+/// - [MarketSigner] — Ed25519 signing (RFC 8032)
 /// - [Eip712Domain] — EIP-712 domain parameters
 /// - [TypedData] — typed structured data for EIP-712
 /// - [jsonRoundTrip] — round-trip serialization helper

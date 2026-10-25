@@ -64,8 +64,7 @@ function parseSeedHex(hex: string): Uint8Array {
     }
     return bytes;
   }
-  // Dev fallback: hash arbitrary short strings to a 32-byte seed.
-  return createHash('sha256').update(hex, 'utf8').digest();
+  throw new Error('ed25519SeedHex must be a 32-byte hex string (64 chars)');
 }
 
 function parseEthPrivateKey(hex: string): Hex {

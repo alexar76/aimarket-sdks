@@ -8,17 +8,32 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AimarketAgentConfig {
     pub hub_url: String,
     pub wallet_key: String,
     pub affiliate: String,
     pub timeout: Duration,
+    /// Retained for configuration compatibility; paid invokes are always single-shot.
     pub max_retries: u32,
     pub verify_tee: bool,
     /// Key of a credit account on the hub (credits rail). When set, every invoke is paid by
     /// that account and sent as `X-API-Key`; no channel is opened or needed.
     pub api_key: Option<String>,
+}
+
+impl std::fmt::Debug for AimarketAgentConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AimarketAgentConfig")
+            .field("hub_url", &self.hub_url)
+            .field("wallet_key", &"[redacted]")
+            .field("affiliate", &self.affiliate)
+            .field("timeout", &self.timeout)
+            .field("max_retries", &self.max_retries)
+            .field("verify_tee", &self.verify_tee)
+            .field("api_key", &self.api_key.as_ref().map(|_| "[redacted]"))
+            .finish()
+    }
 }
 
 impl AimarketAgentConfig {
@@ -95,35 +110,15 @@ impl AimarketAgent {
             tee_verifier: Mutex::new(TeeVerifier::new(&config.wallet_key, HashMap::new())),
             client: Client::builder()
                 .timeout(config.timeout)
+                .redirect(reqwest::redirect::Policy::none())
                 .build()
-                .unwrap_or_else(|_| Client::new()),
+                .expect("failed to initialize the non-redirecting HTTP client"),
             channel_cache: Mutex::new(HashMap::new()),
             channel_secrets: Mutex::new(HashMap::new()),
             channel_wallets: Mutex::new(HashMap::new()),
             well_known_cache: Mutex::new(None),
             config,
         }
-    }
-
-    async fn retry_with_backoff<T, F, Fut>(&self, mut operation: F) -> Result<T, AimarketError>
-    where
-        F: FnMut() -> Fut,
-        Fut: std::future::Future<Output = Result<T, AimarketError>>,
-    {
-        let mut last_error =
-            AimarketError::Network(format!("Request failed after {} retries", self.config.max_retries));
-
-        for attempt in 0..=self.config.max_retries {
-            match operation().await {
-                Ok(value) => return Ok(value),
-                Err(AimarketError::Network(e)) => last_error = AimarketError::Network(e),
-                Err(e) => return Err(e),
-            }
-            if attempt < self.config.max_retries {
-                tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
-            }
-        }
-        Err(last_error)
     }
 
     // ── Phase 1: Discovery ────────────────────────────────────────
@@ -377,26 +372,10 @@ impl AimarketAgent {
                     .into(),
             ));
         }
-        // A verified invoke with wait=true blocks server-side until Metis returns
-        // a verdict while the hub holds the debit in escrow. Retrying it on a
-        // transient error would re-POST a fresh nonce mid-wait and open a SECOND
-        // hold — the buyer pays twice. Fire it exactly once (no retry) in that case.
-        if verify_block_waits(verify.as_ref()) {
-            return self
-                .invoke_once(capability_id, input, channel_id, product_id, source_hub, verify)
-                .await;
-        }
-        self.retry_with_backoff(|| {
-            self.invoke_once(
-                capability_id,
-                input.clone(),
-                channel_id,
-                product_id,
-                source_hub,
-                verify.clone(),
-            )
-        })
-        .await
+        // A lost response cannot tell us whether this POST was charged. The
+        // protocol does not require idempotency support, so never replay it.
+        self.invoke_once(capability_id, input, channel_id, product_id, source_hub, verify)
+            .await
     }
 
     async fn invoke_once(
@@ -806,6 +785,63 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+    #[test]
+    fn configuration_debug_does_not_expose_private_key_or_api_key() {
+        let mut config = AimarketAgentConfig::new("https://hub.test", "private-seed-for-redaction-test");
+        config.api_key = Some("api-token-for-redaction-test".into());
+        let printed = format!("{config:?}");
+        assert!(!printed.contains("private-seed-for-redaction-test"));
+        assert!(!printed.contains("api-token-for-redaction-test"));
+        assert!(printed.contains("[redacted]"));
+    }
+
+    #[tokio::test]
+    async fn lost_paid_response_is_never_replayed() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let served = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let first = read_request(&mut socket).await;
+            assert_eq!(first.header("X-API-Key"), Some("test-secret"));
+            // The hub charged this request, but the response was lost.
+            drop(socket);
+            if let Ok(Ok((mut replay, _))) = tokio::time::timeout(
+                Duration::from_millis(1500), listener.accept(),
+            ).await {
+                let _ = read_request(&mut replay).await;
+                replay.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}").await.unwrap();
+                return 2;
+            }
+            1
+        });
+        let agent = agent_with_key(&url, "test-secret");
+        assert!(agent.invoke("cap-1", serde_json::json!({}), "", None, None, None).await.is_err());
+        assert_eq!(served.await.unwrap(), 1, "a second POST could charge again");
+    }
+
+    #[tokio::test]
+    async fn authenticated_request_never_follows_a_redirect() {
+        let target = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_url = format!("http://{}", target.local_addr().unwrap());
+        let source = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let source_url = format!("http://{}", source.local_addr().unwrap());
+        let served = tokio::spawn(async move {
+            let (mut socket, _) = source.accept().await.unwrap();
+            let _ = read_request(&mut socket).await;
+            socket.write_all(format!("HTTP/1.1 307 Temporary Redirect\r\nLocation: {target_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+            if let Ok(Ok((mut leaked, _))) = tokio::time::timeout(Duration::from_millis(300), target.accept()).await {
+                let _ = read_request(&mut leaked).await;
+                leaked.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}").await.unwrap();
+                return true;
+            }
+            false
+        });
+        let agent = agent_with_key(&source_url, "test-secret");
+        let result = agent.invoke("cap-1", serde_json::json!({}), "", None, None, None).await.unwrap();
+        assert!(!result.success);
+        assert!(!served.await.unwrap(), "redirect target received payment credentials");
+    }
+
     /// A hub that answers exactly one request with `status` and `body`, and reports the path.
     async fn one_shot_hub(
         status: &'static str,
@@ -912,7 +948,7 @@ mod tests {
     fn agent_with_key(url: &str, api_key: &str) -> AimarketAgent {
         AimarketAgent::with_config(AimarketAgentConfig {
             api_key: Some(api_key.to_string()),
-            ..AimarketAgentConfig::new(url, "abcdef0123")
+            ..AimarketAgentConfig::new(url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
         })
     }
 
@@ -1035,7 +1071,7 @@ mod tests {
     async fn an_invoke_with_neither_channel_nor_key_is_refused_before_sending() {
         // Port 9 (discard) is closed: had the SDK sent anything it would come back as a
         // network error after its retries, not as a payment error.
-        let agent = AimarketAgent::new("http://127.0.0.1:9", "abcdef0123");
+        let agent = AimarketAgent::new("http://127.0.0.1:9", "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let err = agent
             .invoke("cap-1", serde_json::json!({}), "", None, None, None)
             .await
@@ -1047,7 +1083,7 @@ mod tests {
     async fn open_channel_sends_the_deposit_and_reads_the_hub_channel() {
         let (url, served) =
             scripted_hub(vec![("200 OK", hub_channel("ch_9f3c2a1b7d4e5f60", DEPOSIT_TX))]).await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let paid = ChannelDeposit {
             tx_hash: DEPOSIT_TX.to_string(),
             payer_signature: Some("0xpayerproof".to_string()),
@@ -1081,7 +1117,7 @@ mod tests {
     async fn open_channel_without_a_deposit_sends_no_tx_hash() {
         let (url, served) =
             scripted_hub(vec![("200 OK", hub_channel("ch_dev", ""))]).await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         agent.open_channel(5.0, "USDT", "base", None).await.unwrap();
 
         let seen = served.await.unwrap();
@@ -1099,7 +1135,7 @@ mod tests {
             ("200 OK", hub_channel("ch_second_deposit", &second_tx)),
         ])
         .await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let first = agent
             .open_channel(5.0, "USDC", "base", Some(&deposit(DEPOSIT_TX)))
             .await
@@ -1124,7 +1160,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_deposit_without_a_tx_hash_is_refused_before_sending() {
-        let agent = AimarketAgent::new("http://127.0.0.1:9", "abcdef0123");
+        let agent = AimarketAgent::new("http://127.0.0.1:9", "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let err = agent
             .open_channel(5.0, "USDC", "base", Some(&deposit("  ")))
             .await
@@ -1139,7 +1175,7 @@ mod tests {
             ("200 OK", PAID_INVOKE.to_string()),
         ])
         .await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let channel = agent
             .open_channel(5.0, "USDC", "base", Some(&deposit(DEPOSIT_TX)))
             .await
@@ -1177,7 +1213,7 @@ mod tests {
             ("200 OK", settlement),
         ])
         .await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let channel = agent
             .open_channel(5.0, "USDC", "base", Some(&deposit(DEPOSIT_TX)))
             .await
@@ -1204,7 +1240,7 @@ mod tests {
             r#"{"hashes":[{"capability_id":"cap-1","code_hash":"abc123"},{"capability_id":"cap-2"}]}"#,
         )
         .await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         assert_eq!(agent.fetch_trusted_hashes().await.unwrap(), 2);
         assert_eq!(
             served.await.unwrap(),
@@ -1215,7 +1251,7 @@ mod tests {
     #[tokio::test]
     async fn fetch_trusted_hashes_reports_a_hub_that_has_no_registry() {
         let (url, _served) = one_shot_hub("404 Not Found", r#"{"detail":"Not Found"}"#).await;
-        let agent = AimarketAgent::new(&url, "abcdef0123");
+        let agent = AimarketAgent::new(&url, "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let err = agent.fetch_trusted_hashes().await.unwrap_err();
         assert!(matches!(err, AimarketError::Protocol(_)), "{err:?}");
     }
@@ -1230,7 +1266,7 @@ mod tests {
             output_hash: hex_sha(r#"{"answer":"hello"}"#),
             signature: String::new(),
         };
-        let agent = AimarketAgent::new("http://127.0.0.1:9", "abcdef0123");
+        let agent = AimarketAgent::new("http://127.0.0.1:9", "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         assert!(agent.verify_tee_receipt(&receipt, r#"{"text":"hi"}"#, r#"{"answer":"hello"}"#));
         assert!(!agent.verify_tee_receipt(
             &receipt,

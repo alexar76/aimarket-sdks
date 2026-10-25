@@ -12,6 +12,7 @@ export class MockFetch {
   readonly bodyLog: string[] = [];
   /** Request headers, normalised by the platform Headers implementation. */
   readonly headerLog: Headers[] = [];
+  readonly redirectLog: (RequestRedirect | undefined)[] = [];
   private failPostUntil = 0;
   private failPostCount = 0;
 
@@ -42,6 +43,7 @@ export class MockFetch {
     this.requestLog.push(key);
     this.bodyLog.push(typeof init?.body === 'string' ? init.body : '');
     this.headerLog.push(new Headers(init?.headers));
+    this.redirectLog.push(init?.redirect);
 
     if (method === 'POST' && this.failPostCount < this.failPostUntil) {
       this.failPostCount++;

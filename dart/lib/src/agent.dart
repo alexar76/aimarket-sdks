@@ -45,9 +45,7 @@ class AimarketAgentConfig {
   /// Per-request timeout. Defaults to 30 seconds.
   final Duration timeout;
 
-  /// Maximum number of retries for transient network failures.
-  ///
-  /// Each retry doubles the delay: 1s, 2s, 4s, etc.
+  /// Retained for configuration compatibility; financial invokes are single-shot.
   final int maxRetries;
 
   /// Map of capability ID to known-good code hash for TEE verification.
@@ -118,8 +116,7 @@ class AimarketException implements Exception {
 
 /// Network-level error: timeout, connection refused, DNS failure, etc.
 ///
-/// Retry logic catches this type specifically; other [AimarketException]
-/// subclasses propagate immediately.
+/// Transport errors propagate without replaying a possibly charged request.
 class AimarketNetworkException extends AimarketException {
   const AimarketNetworkException(super.message, {super.statusCode});
 
@@ -255,7 +252,7 @@ class AimarketAgent {
   /// [affiliate] is sent in the X-AIMarket-Affiliate header.
   /// [trustedCodeHashes] pre-populates TEE code hash verification.
   /// [timeout] sets the per-request timeout (default 30s).
-  /// [maxRetries] sets the number of retry attempts (default 3).
+  /// [maxRetries] is retained for compatibility; paid invokes are never replayed.
   /// [apiKey] is a credit-account key (from `POST /ai-market/v2/accounts`, or
   /// issued by the hub's operator). When set, invokes are paid by the account
   /// and sent as `X-API-Key`; no channel is opened or needed.
@@ -282,44 +279,18 @@ class AimarketAgent {
           signer: MarketSigner(privateKeyHex: walletKey),
           trustedCodeHashes: trustedCodeHashes,
         ),
-        _http = httpClient ?? http.Client();
+        _http = _NoRedirectClient(httpClient ?? http.Client());
 
-  // ── Internal: Retry with Exponential Backoff ───────────────────────
-
-  /// Execute [operation] with exponential backoff on network errors.
-  ///
-  /// Retries up to [_config.maxRetries] times with delays of 1s, 2s, 4s, etc.
-  /// Only [AimarketNetworkException] triggers a retry — all other exceptions
-  /// propagate immediately so protocol/payment/safety errors are surfaced
-  /// without delay.
-  ///
-  /// Timeout errors from `Future.timeout()` and `http.ClientException` are
-  /// both converted to [AimarketNetworkException] and retried.
-  Future<T> _retryWithBackoff<T>(Future<T> Function() operation) async {
-    var lastError = AimarketNetworkException(
-        'Request failed after ${_config.maxRetries} retries');
-
-    for (var attempt = 0; attempt <= _config.maxRetries; attempt++) {
-      try {
-        return await operation();
-      } on TimeoutException catch (e) {
-        lastError = AimarketNetworkException('Request timed out: $e');
-      } catch (e) {
-        if (e is http.ClientException) {
-          lastError =
-              AimarketNetworkException('Network error: ${e.message}');
-        } else {
-          rethrow;
-        }
-      }
-
-      if (attempt < _config.maxRetries) {
-        // Exponential delay: 1s, 2s, 4s (1 << attempt).
-        await Future.delayed(Duration(seconds: 1 << attempt));
-      }
+  // A lost response may already have been charged. Convert transport errors
+  // without retrying a financial POST.
+  Future<T> _requestOnce<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on TimeoutException catch (e) {
+      throw AimarketNetworkException('Request timed out: $e');
+    } on http.ClientException catch (e) {
+      throw AimarketNetworkException('Network error: ${e.message}');
     }
-
-    throw lastError;
   }
 
   // ── Phase 1: Discovery ─────────────────────────────────────────────
@@ -543,9 +514,8 @@ class AimarketAgent {
   /// judges the output against the intent; the verdict envelope comes back as
   /// [InvokeResult.verification].
   ///
-  /// Network errors and timeouts are retried with exponential backoff
-  /// per [_config.maxRetries]. Payment errors (402), safety blocks (403),
-  /// and other protocol errors propagate immediately.
+  /// Invokes are single-shot, including on network errors: a lost response
+  /// may already have been charged. Reconcile the outcome before retrying.
   Future<InvokeResult> invoke({
     required String capabilityId,
     required Map<String, dynamic> input,
@@ -561,23 +531,8 @@ class AimarketAgent {
           'invoke needs a way to pay: pass channelId (from openChannel) or '
           'create the agent with an apiKey');
     }
-    // A verified invoke with wait=true blocks server-side until Metis returns a
-    // verdict while the hub holds the debit in escrow. Retrying it on a transient
-    // error would re-POST a fresh nonce mid-wait and open a SECOND hold — the
-    // buyer pays twice. Fire it exactly once (no retry) in that case.
-    if (_verifyBlockWaits(verify)) {
-      return _invokeOnce(
-        capabilityId: capabilityId,
-        input: input,
-        channelId: channelId,
-        sourceHub: sourceHub,
-        productId: productId,
-        verifyTee: verifyTee,
-        attestation: attestation,
-        verify: verify,
-      );
-    }
-    return _retryWithBackoff(() => _invokeOnce(
+    // A network failure cannot establish that the hub did not charge this call.
+    return _requestOnce(() => _invokeOnce(
           capabilityId: capabilityId,
           input: input,
           channelId: channelId,
@@ -888,4 +843,19 @@ class AimarketAgent {
     _http.close();
     _channelCache.clear();
   }
+}
+
+/// Custom payment headers must never follow an HTTP redirect to another host.
+class _NoRedirectClient extends http.BaseClient {
+  final http.Client _inner;
+  _NoRedirectClient(this._inner);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    request.followRedirects = false;
+    return _inner.send(request);
+  }
+
+  @override
+  void close() => _inner.close();
 }

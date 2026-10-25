@@ -178,7 +178,7 @@ describe('AimarketAgent', () => {
     expect(result.verification).toBeUndefined();
   });
 
-  it('retries invoke on transient network errors', async () => {
+  it('does not replay a possibly charged invoke after a lost response', async () => {
     const mock = new MockFetch();
     mock.failNextPost(2);
     mock.expectPost(
@@ -200,20 +200,17 @@ describe('AimarketAgent', () => {
       maxRetries: 3,
       fetch: mock.fetch,
     });
-    const result = await agent.invoke({
+    await expect(agent.invoke({
       capabilityId: 'cap-1',
       input: {},
       channelId: 'ch_1',
-    });
-    expect(result.success).toBe(true);
-    expect(mock.requestLog.filter((r) => r.startsWith('POST')).length).toBe(3);
+    })).rejects.toThrow('Network error');
+    expect(mock.requestLog.filter((r) => r.startsWith('POST')).length).toBe(1);
   });
 
   it('does NOT retry a verified-wait invoke (no double-charge)', async () => {
     const mock = new MockFetch();
-    // First POST fails transiently. A non-verified invoke would retry and
-    // succeed; a wait=true invoke must be single-shot so a mid-wait re-POST
-    // can't mint a fresh nonce and open a second hold/debit.
+    // A lost response must never mint a second hold/debit.
     mock.failNextPost(1);
     mock.expectPost(
       `${HUB}/ai-market/v2/invoke`,
@@ -506,5 +503,18 @@ describe('Paying on a production hub', () => {
     expect(settlement.channel_id).toBe('ch_9f3c2a1b7d4e5f60');
     expect(settlement.total_spent_usd).toBe(0.01);
     expect(settlement.refund_usd).toBe(4.99);
+  });
+});
+
+
+describe('credential transport', () => {
+  it('refuses redirects on an authenticated invoke', async () => {
+    const mock = new MockFetch();
+    mock.expectPost(`${HUB}/ai-market/v2/invoke`, 307, '{}', { location: 'https://other.test' });
+    const agent = new AimarketAgent({ hubUrl: HUB, walletKey: WALLET_KEY,
+      apiKey: 'test-secret', fetch: mock.fetch });
+    await agent.invoke({ capabilityId: 'cap-1', input: {} });
+    expect(mock.headerLog[0].get('X-API-Key')).toBe('test-secret');
+    expect(mock.redirectLog).toEqual(['error']);
   });
 });

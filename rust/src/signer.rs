@@ -3,9 +3,8 @@
 use crate::eip712::{self, DebitDigestParams};
 pub use crate::eip712::{DEBIT_TYPEHASH_HEADER, ESCROW_CONTRACT_NAME, ESCROW_CONTRACT_VERSION};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use ed25519_dalek::{Signer as Ed25519Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signer as Ed25519Signer, SigningKey, VerifyingKey};
 use k256::ecdsa::{RecoveryId, SigningKey as Secp256k1Key};
-use sha2::{Digest, Sha256};
 
 /// Parameters required to build the EIP-712 `DebitAuthorization` payload.
 #[derive(Debug, Clone)]
@@ -116,20 +115,15 @@ pub fn compute_debit_digest(auth: &DebitAuthorization<'_>) -> [u8; 32] {
     })
 }
 
-fn parse_seed_bytes(hex_or_dev: &str) -> [u8; 32] {
-    let normalized = hex_or_dev.strip_prefix("0x").unwrap_or(hex_or_dev);
-    if normalized.len() == 64 && normalized.chars().all(|c| c.is_ascii_hexdigit()) {
-        let bytes = hex::decode(normalized).unwrap_or_default();
-        if bytes.len() == 32 {
-            let mut out = [0u8; 32];
-            out.copy_from_slice(&bytes);
-            return out;
-        }
+fn parse_seed_bytes(seed: &str) -> Result<[u8; 32], String> {
+    let normalized = seed.strip_prefix("0x").or_else(|| seed.strip_prefix("0X")).unwrap_or(seed);
+    if normalized.len() != 64 || !normalized.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("ed25519 seed must be a 32-byte hex string (64 chars)".into());
     }
-    let digest = Sha256::digest(hex_or_dev.as_bytes());
+    let bytes = hex::decode(normalized).map_err(|_| "invalid ed25519 seed hex")?;
     let mut out = [0u8; 32];
-    out.copy_from_slice(&digest);
-    out
+    out.copy_from_slice(&bytes);
+    Ok(out)
 }
 
 fn parse_eth_private_key(hex: &str) -> Result<[u8; 32], String> {
@@ -171,15 +165,21 @@ pub struct MarketSigner {
 
 impl MarketSigner {
     pub fn new(ed25519_seed_hex: &str) -> Self {
-        Self {
-            ed25519: SigningKey::from_bytes(&parse_seed_bytes(ed25519_seed_hex)),
+        Self::try_new(ed25519_seed_hex).expect("invalid Ed25519 seed: expected 32-byte hex")
+    }
+
+    /// Fallible construction for keys read from configuration. Never hashes a
+    /// passphrase or placeholder into a predictable signing identity.
+    pub fn try_new(ed25519_seed_hex: &str) -> Result<Self, String> {
+        Ok(Self {
+            ed25519: SigningKey::from_bytes(&parse_seed_bytes(ed25519_seed_hex)?),
             ethereum_private_key: None,
-        }
+        })
     }
 
     pub fn with_ethereum_key(ed25519_seed_hex: &str, ethereum_private_key_hex: &str) -> Result<Self, String> {
         Ok(Self {
-            ed25519: SigningKey::from_bytes(&parse_seed_bytes(ed25519_seed_hex)),
+            ed25519: SigningKey::from_bytes(&parse_seed_bytes(ed25519_seed_hex)?),
             ethereum_private_key: Some(parse_eth_private_key(ethereum_private_key_hex)?),
         })
     }
@@ -278,6 +278,18 @@ mod tests {
         assert!(sig.starts_with("ed25519:"));
         assert!(s.verify(&s.public_key_hex(), &sig, "hello"));
         assert!(!s.verify(&s.public_key_hex(), &sig, "world"));
+    }
+
+    #[test]
+    fn malformed_seed_is_never_hashed_into_a_predictable_identity() {
+        for invalid in ["", "your-wallet-private-key-hex", "abc", "0x12", "not-a-secret"] {
+            assert!(MarketSigner::try_new(invalid).is_err());
+            assert!(MarketSigner::with_ethereum_key(invalid, ETH_KEY).is_err());
+            assert!(std::panic::catch_unwind(|| MarketSigner::new(invalid)).is_err());
+        }
+        let expected = MarketSigner::try_new(ED25519_SEED).unwrap().public_key_hex();
+        assert_eq!(MarketSigner::try_new(&format!("0x{ED25519_SEED}")).unwrap().public_key_hex(), expected);
+        assert_eq!(MarketSigner::try_new(&format!("0X{ED25519_SEED}")).unwrap().public_key_hex(), expected);
     }
 
     #[test]

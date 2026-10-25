@@ -355,10 +355,10 @@ mod tests {
 
     #[test]
     fn verifies_with_trusted_hash() {
-        let signer = MarketSigner::new("abcdef0123");
+        let signer = MarketSigner::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let att = sample_attestation(&signer);
         let mut verifier = TeeVerifier::with_enclave_keys(
-            "abcdef0123",
+            "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
             HashMap::from([("cap-1".into(), "abc123".into())]),
             HashMap::from([("aws_nitro".into(), signer.public_key_hex())]),
         );
@@ -367,10 +367,10 @@ mod tests {
 
     #[test]
     fn a_loaded_registry_is_enforced_and_skips_incomplete_entries() {
-        let signer = MarketSigner::new("abcdef0123");
+        let signer = MarketSigner::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let att = sample_attestation(&signer); // code_hash "abc123"
         let mut verifier = TeeVerifier::with_enclave_keys(
-            "abcdef0123",
+            "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
             HashMap::new(),
             HashMap::from([("aws_nitro".into(), signer.public_key_hex())]),
         );
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn a_registry_without_hashes_trusts_nothing() {
-        let mut verifier = TeeVerifier::new("abcdef0123", HashMap::new());
+        let mut verifier = TeeVerifier::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60", HashMap::new());
         assert_eq!(verifier.load_trusted_hashes(&serde_json::json!({})), 0);
         assert_eq!(
             verifier.load_trusted_hashes(&serde_json::json!({"hashes": "nope"})),
@@ -406,10 +406,10 @@ mod tests {
 
     #[test]
     fn rejects_unsupported_platform() {
-        let signer = MarketSigner::new("abcdef0123");
+        let signer = MarketSigner::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let mut att = sample_attestation(&signer);
         att.platform = "bogus".into();
-        let mut verifier = TeeVerifier::new("abcdef0123", HashMap::new());
+        let mut verifier = TeeVerifier::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60", HashMap::new());
         let result = verifier.verify_attestation_detailed(&att, "cap-1");
         assert!(!result.is_valid);
     }
@@ -419,10 +419,10 @@ mod tests {
         // No enclave override: the platform key stays a placeholder, which must
         // never be trusted even when everything else about the attestation is
         // self-consistent and signed.
-        let signer = MarketSigner::new("abcdef0123");
+        let signer = MarketSigner::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let att = sample_attestation(&signer);
         let mut verifier =
-            TeeVerifier::new("abcdef0123", HashMap::from([("cap-1".into(), "abc123".into())]));
+            TeeVerifier::new("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60", HashMap::from([("cap-1".into(), "abc123".into())]));
         let result = verifier.verify_attestation_detailed(&att, "cap-1");
         assert!(!result.is_valid);
         assert!(
