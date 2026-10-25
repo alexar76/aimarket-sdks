@@ -11,6 +11,8 @@ Part of the [AIMarket SDKs](https://github.com/alexar76/aimarket-sdks) (Dart · 
 
 ## Install
 
+Requires Rust 1.87 or newer for the patched K256/ECDSA cryptography dependencies.
+
 ```toml
 # Cargo.toml — published on crates.io:
 [dependencies]

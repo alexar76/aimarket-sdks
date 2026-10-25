@@ -229,8 +229,7 @@ impl MarketSigner {
         let signing_key =
             Secp256k1Key::from_bytes((&eth_key).into()).map_err(|e| e.to_string())?;
         let (sig, recovery_id): (k256::ecdsa::Signature, RecoveryId) = signing_key
-            .sign_prehash_recoverable(&digest)
-            .map_err(|e| e.to_string())?;
+            .sign_prehash_recoverable(&digest);
         let sig_bytes = sig.to_bytes();
         let r = &sig_bytes[..32];
         let s = &sig_bytes[32..];

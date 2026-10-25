@@ -137,8 +137,7 @@ pub fn sign_channel_open_proof(
         SigningKey::from_slice(&key_bytes).map_err(|e| format!("bad private key: {e}"))?;
     let digest = channel_open_proof_hash(params);
     let (sig, recovery_id): (k256::ecdsa::Signature, RecoveryId) = signing_key
-        .sign_prehash_recoverable(&digest)
-        .map_err(|e| format!("signing failed: {e}"))?;
+        .sign_prehash_recoverable(&digest);
     let mut out = Vec::with_capacity(65);
     out.extend_from_slice(&sig.to_bytes());
     out.push(recovery_id.to_byte() + 27);
@@ -164,7 +163,7 @@ pub fn recover_channel_open_payer(
         .map_err(|e| format!("recovery failed: {e}"))?;
     // The address is the last 20 bytes of keccak256 over the UNCOMPRESSED public key with
     // its 0x04 tag stripped.
-    let encoded = key.to_encoded_point(false);
+    let encoded = key.to_sec1_point(false);
     let hash = keccak256(&encoded.as_bytes()[1..]);
     Ok(format!("0x{}", hex::encode(&hash[12..])))
 }
