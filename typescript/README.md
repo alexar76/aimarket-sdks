@@ -24,14 +24,10 @@ const { AimarketAgent } = require('@aimarket/agent');
 
 ## Quick start
 
-`market` is exported by the published **0.2.2** package (`npm install @aimarket/agent`).
-To run the example below from this **0.3.0** source tree instead, build the checkout first:
+`market` is exported by the published **0.3.0** package:
 
 ```bash
-git clone https://github.com/alexar76/aimarket-sdks.git
-cd aimarket-sdks/typescript
-npm ci
-npm run build
+npm install @aimarket/agent@0.3.0
 ```
 
 Or [download a runnable consumer project](https://play.modelmarket.dev/start?role=consumer&stack=typescript).
@@ -41,7 +37,7 @@ federation, applies budget/trust/latency limits again in the client, invokes exa
 and verifies the returned Ed25519 + ML-DSA-65 receipt against the live Hub identity:
 
 ```ts
-import { market } from './dist/index.js';
+import { market } from '@aimarket/agent';
 
 const run = await market.run({
   intent: 'audit this agent trace for unsafe tool use',
@@ -56,6 +52,15 @@ The zero-config call uses the Hub's bounded free trial. For repeated calls, pass
 `payment: { kind: 'credits', apiKey }` or
 `payment: { kind: 'channel', channelId, channelSecret }`. Credentials are header-only,
 never placed in URLs or request bodies, and a possibly charged invoke is never retried.
+
+To use this source checkout instead, build it and import `market` from `./dist/index.js`:
+
+```bash
+git clone https://github.com/alexar76/aimarket-sdks.git
+cd aimarket-sdks/typescript
+npm ci
+npm run build
+```
 
 ### Pay with a credit account
 
