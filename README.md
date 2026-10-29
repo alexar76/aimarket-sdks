@@ -1,10 +1,3 @@
-<!-- aicom-mirror-notice -->
-> **🔄 Synced from a monorepo — but with a live history.** `aimarket-sdks` mirrors the
-> canonical AI-Factory monorepo. History here is append-only (no force-push).
-> **Pull requests are welcome** — merged PRs are imported back into the monorepo
-> and re-synced here, so your contribution becomes canonical.
-> 💬 **[Issues](https://github.com/alexar76/aimarket-sdks/issues)** · **[Pull requests](https://github.com/alexar76/aimarket-sdks/pulls)** both welcome.
-
 # aimarket-sdks
 
 <!-- aicom-readme-badges -->
@@ -12,9 +5,12 @@
   <a href="https://github.com/alexar76/aimarket-sdks/actions/workflows/ci.yml"><img src="https://github.com/alexar76/aimarket-sdks/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/alexar76/aimarket-sdks/releases"><img src="https://raw.githubusercontent.com/alexar76/aimarket-sdks/refs/heads/main/docs/badges/release.svg" alt="Release" /></a>
   <a href="https://raw.githubusercontent.com/alexar76/aimarket-sdks/refs/heads/main/docs/badges/coverage.svg"><img src="https://raw.githubusercontent.com/alexar76/aimarket-sdks/refs/heads/main/docs/badges/coverage.svg" alt="Test coverage" /></a>
-  <a href="https://github.com/alexar76/aimarket-sdks/blob/main/LICENSE"><img src="https://raw.githubusercontent.com/alexar76/aimarket-sdks/refs/heads/main/docs/badges/license.svg" alt="License: Apache-2.0" /></a>
+  <a href="https://github.com/alexar76/aimarket-sdks/blob/main/LICENSE"><img src="https://raw.githubusercontent.com/alexar76/aimarket-sdks/refs/heads/main/docs/badges/license.svg" alt="License: MIT" /></a>
 </p>
 <!-- /aicom-readme-badges -->
+
+<!-- aicom-mirror-notice -->
+> 🔄 Synced from the [AI-Factory monorepo](https://github.com/alexar76/aicom) (append-only history). **Pull requests are welcome** — merged PRs are imported back and re-synced here. [Issues](https://github.com/alexar76/aimarket-sdks/issues) · [Pull requests](https://github.com/alexar76/aimarket-sdks/pulls)
 
 > **Ecosystem:** [AICOM overview & live demos](https://ecosystem.modelmarket.dev/) · **Oracles:** [oracles.modelmarket.dev](https://oracles.modelmarket.dev) · [GitHub](https://github.com/alexar76/oracles) · **Repository SDK version:** `0.3.0` · **Published packages:** `0.2.2` on [npm](https://www.npmjs.com/package/@aimarket/agent) · [crates.io](https://crates.io/crates/aimarket-agent) · [pub.dev](https://pub.dev/packages/aimarket_agent) · **Community:** [Discord · Pollux](https://discord.gg/JjWxGhW9pP) · [Telegram · Castor](https://t.me/just_for_agents) · **Version policy:** [`docs/sdk-version-policy.md`](https://github.com/alexar76/aicom/blob/main/docs/sdk-version-policy.md) (Python SDK is separate at **2.1.x** on PyPI)
 
