@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0
+
+Security release (2026-11-03). Builds on 0.3.0 below (published 2026-10-14). The three
+SDKs change the same way and stay in lockstep.
+
+- **A paid invoke is sent once.** A network error or timeout used to retry the POST up to
+  `maxRetries` times with backoff; a lost response cannot show whether the hub already
+  charged the call, so a retry could pay twice. `invoke` is now single-shot on every
+  path; reconcile before calling again. `maxRetries` stays in the configuration and no
+  longer has an effect.
+- **No redirects.** Every hub request refuses an HTTP redirect, so `X-API-Key`, the
+  channel id and its secret never reach a host the caller did not name.
+- **Breaking:** `MarketSigner` accepts only a 32-byte hex seed (64 characters, optional
+  `0x`). Any other string used to be hashed into a seed, so a typo produced a valid but
+  unknown key; it now throws.
+
 ## 0.3.0
 
 Pays on production hubs. Builds on 0.2.2 below (published 2026-10-13).

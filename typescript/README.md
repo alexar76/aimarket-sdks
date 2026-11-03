@@ -24,10 +24,10 @@ const { AimarketAgent } = require('@aimarket/agent');
 
 ## Quick start
 
-`market` is exported by the published **0.3.0** package:
+`market` is exported by the published package since 0.2.2:
 
 ```bash
-npm install @aimarket/agent@0.3.0
+npm install @aimarket/agent@0.4.0
 ```
 
 Or [download a runnable consumer project](https://play.modelmarket.dev/start?role=consumer&stack=typescript).

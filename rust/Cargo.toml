@@ -1,6 +1,6 @@
 [package]
 name = "aimarket-agent"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.87"
 description = "AI Market Protocol v2 consumer SDK for Rust — Tauri desktop apps, CLI tools"

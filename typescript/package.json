@@ -1,6 +1,6 @@
 {
   "name": "@aimarket/agent",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI Market Protocol v2 consumer SDK for TypeScript — Electron, Node.js, web apps",
   "repository": "https://github.com/alexar76/aimarket-sdks",
   "homepage": "https://github.com/alexar76/aimarket-sdks/tree/main/typescript",

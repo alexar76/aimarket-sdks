@@ -14,7 +14,7 @@ Part of the [AIMarket SDKs](https://github.com/alexar76/aimarket-sdks) (Dart · 
 ```yaml
 # pubspec.yaml — published on pub.dev:
 dependencies:
-  aimarket_agent: ^0.3.0
+  aimarket_agent: ^0.4.0
 # or run:  dart pub add aimarket_agent
 #
 # Local dev against the monorepo (optional):

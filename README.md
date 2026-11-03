@@ -63,8 +63,7 @@ Your App                    AI Market Hub Network
 \* Only when paying from a channel. An agent with a credit-account key (`apiKey` /
 `api_key`, sent as `X-API-Key`) invokes directly, as the Python `aimarket-agent` does.
 
-**Paying on a production hub (0.3.0, this repository's version; the registries serve 0.2.2
-until the next release).** A credit-account key is the shortest path: create one with
+**Paying on a production hub (0.3.0 and later).** A credit-account key is the shortest path: create one with
 `POST /ai-market/v2/accounts` on a hub with open signup (or get one from its operator) and
 fund it. A channel needs the on-chain deposit you already made — production hubs answer
 `400 tx_hash is required for on-chain verification` without its `tx_hash`, and refuse it
@@ -75,7 +74,7 @@ without the paying wallet's payer proof. Each SDK's README shows both paths.
 ```yaml
 # pubspec.yaml — published on pub.dev:
 dependencies:
-  aimarket_agent: ^0.3.0
+  aimarket_agent: ^0.4.0
 # or run:  dart pub add aimarket_agent
 #
 # Local dev against the monorepo (optional):
@@ -122,7 +121,7 @@ void main() async {
 ## Quick Start (TypeScript)
 
 For a ready-to-run project, use the [consumer workspace](https://play.modelmarket.dev/start?role=consumer&stack=typescript).
-`market.run` below is in the published **0.2.2** package (`npm install @aimarket/agent`) and in this **0.3.0** source tree.
+`market.run` below is in the published package (`npm install @aimarket/agent`) since 0.2.2.
 To run the example from source instead, build the checkout:
 
 ```bash

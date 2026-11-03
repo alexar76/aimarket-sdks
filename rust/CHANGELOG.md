@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0
+
+Security release (2026-11-03). Builds on 0.3.0 below (published 2026-10-14). The three
+SDKs change the same way and stay in lockstep.
+
+- **A paid invoke is sent once.** A network error or timeout used to retry the POST up to
+  `max_retries` times with backoff; a lost response cannot show whether the hub already
+  charged the call, so a retry could pay twice. `invoke` is now single-shot on every
+  path; reconcile before calling again. `max_retries` stays in the configuration and no
+  longer has an effect.
+- **No redirects.** Every hub request refuses an HTTP redirect, so `X-API-Key`, the
+  channel id and its secret never reach a host the caller did not name.
+- **Breaking:** `MarketSigner::new` accepts only a 32-byte hex seed (optional `0x`/`0X`)
+  and panics on anything else; `MarketSigner::try_new` returns the error instead. Any
+  other string used to be hashed into a seed.
+- `AimarketAgentConfig`'s `Debug` prints `[redacted]` for the wallet key and the API key.
+- **Breaking:** requires Rust 1.87. `k256` 0.14 and `ecdsa` 0.17, with `crypto-bigint`
+  0.7.6 as a floor for RUSTSEC-2026-0387.
+
 ## 0.3.0
 
 Pays on production hubs. Builds on 0.2.2 below (published 2026-10-13).
