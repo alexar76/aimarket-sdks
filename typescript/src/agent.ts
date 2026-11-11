@@ -516,6 +516,15 @@ export class AimarketAgent {
 
   // ── Phase 4: Settle ───────────────────────────────────────────
 
+  /**
+   * Close a payment channel in the hub's ledger.
+   *
+   * `refund_usd` in the answer is the unspent remainder, not money already sent back: the
+   * hub submits nothing on-chain. On an escrow-funded channel the remainder stays in
+   * AIMarketEscrow until the depositor calls `requestClose` and then `settleChannel` (or
+   * `expireChannel` after expiry). On a transfer-funded channel it is a debt the operator
+   * owes (`refund_owed_usd`).
+   */
   async closeChannel(channelId: string): Promise<Settlement> {
     for (const [key, cached] of this.channelCache) {
       if (cached.channel.channel_id === channelId) {

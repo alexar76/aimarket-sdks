@@ -489,8 +489,9 @@ class TeeReceipt {
 
 /// Settlement returned after closing a payment channel.
 ///
-/// Includes the total amount spent, the refund returned to the wallet,
-/// and the number of invocations that were paid from this channel.
+/// Includes the total amount spent, the unspent remainder ([refundUsd]) and
+/// the number of invocations that were paid from this channel. The remainder
+/// is not sent back by the close itself: see `AimarketAgent.closeChannel`.
 class Settlement {
   final String channelId;
   final double totalSpentUsd;

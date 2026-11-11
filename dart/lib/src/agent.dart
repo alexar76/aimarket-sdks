@@ -705,11 +705,18 @@ class AimarketAgent {
 
   // ── Phase 4: Settle ────────────────────────────────────────────────
 
-  /// Close a payment channel and get a refund for the unused balance.
+  /// Close a payment channel in the hub's ledger.
   ///
   /// Removes the channel from the in-memory cache and calls the hub's
   /// channel close endpoint. The returned [Settlement] includes the
-  /// total spent, refund amount, and invocation count.
+  /// total spent, the unspent remainder ([Settlement.refundUsd]) and the
+  /// invocation count.
+  ///
+  /// The hub sends nothing on-chain. On an escrow-funded channel the
+  /// remainder stays in AIMarketEscrow until the depositor calls
+  /// `requestClose` and then `settleChannel` (or `expireChannel` after
+  /// expiry). On a transfer-funded channel it is a debt the operator owes
+  /// (`refund_owed_usd`), not money already sent back.
   Future<Settlement> closeChannel(String channelId) async {
     // Evict from cache regardless of response.
     _channelCache.removeWhere((_, cached) => cached.channel.id == channelId);

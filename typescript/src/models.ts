@@ -83,6 +83,7 @@ export interface PlanStep {
 export interface Settlement {
   channel_id: string;
   total_spent_usd: number;
+  /** The unspent remainder; see closeChannel for how it actually comes back. */
   refund_usd: number;
   invocations: number;
 }
