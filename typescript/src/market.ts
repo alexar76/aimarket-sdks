@@ -52,6 +52,8 @@ export interface ReceiptVerification {
   classical_valid: boolean;
   pq_present: boolean;
   pq_valid: boolean | null;
+  /** Hub 3.20.0+: whether the ML-DSA key was pinned (this hub's own, or one pinned for the peer). */
+  pq_pinned?: boolean | null;
   algorithm: string;
   signature_version: string | null;
   signer_matches_live_key: boolean;
